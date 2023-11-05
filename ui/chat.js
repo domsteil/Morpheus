@@ -80,10 +80,10 @@ async function populateModels() {
   }
   catch (error) {
     document.getElementById('errorText').innerHTML =
-    DOMPurify.sanitize(marked.parse(
-    `Ollama-ui was unable to communitcate with Ollama due to the following error:\n\n`
-    + `\`\`\`${error.message}\`\`\`\n\n---------------------\n`
-    + faqString));
+      DOMPurify.sanitize(marked.parse(
+        `Ollama-ui was unable to communitcate with Ollama due to the following error:\n\n`
+        + `\`\`\`${error.message}\`\`\`\n\n---------------------\n`
+        + faqString));
     let modal = new bootstrap.Modal(document.getElementById('errorModal'));
     modal.show();
   }
@@ -117,7 +117,7 @@ let isAutoScrollOn = true;
 // autoscroll when new line is added
 const autoScroller = new ResizeObserver(() => {
   if (isAutoScrollOn) {
-    scrollWrapper.scrollIntoView({behavior: "smooth", block: "end"});
+    scrollWrapper.scrollIntoView({ behavior: "smooth", block: "end" });
   }
 });
 
@@ -146,6 +146,87 @@ document.addEventListener("scroll", (event) => {
   }
   lastKnownScrollPosition = window.scrollY;
 });
+
+async function submitAsyncRAGRequest() {
+
+  const input = document.getElementById('user-input').value;
+  const selectedModel = getSelectedModel();
+  const context = document.getElementById('chat-history').context;
+  const data = { model: selectedModel, prompt: input, context: context };
+
+  const chatFile = path.resolve('morpheus-electron/morpheus/renderer/public/channelthreads/chat.jsonl');
+
+  const chatHistory = JSON.parse(fs.readFileSync(chatFile, 'utf8'));
+
+  console.log('Chat History', chatHistory);
+
+  // Write the chat history to the file
+  fs.appendFileSync(chatFile, JSON.stringify({ role: "domsteil", content: question }) + '\n');
+
+  // Fetch embeddings from the API
+  const embeddingsRequestOptions = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'llama2', prompt: question }),
+  };
+
+  const embeddingResponse = await fetch('http://localhost:11434/api/embeddings', embeddingsRequestOptions);
+  const embeddingJson = await embeddingResponse.json();
+  const xq = embeddingJson.embedding;
+
+  // Read contract embeddings from the file
+  const file = path.resolve('morpheus-electron/morpheus/renderer/public/embeddings/uniswap.json');
+  const contractEmbeddings = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+  // For each item in contract embeddings find the one with the highest similarity score
+  // LB
+  let maxScore = 0;
+  let maxScoreIndex = 0;
+
+  for (let i = 0; i < contractEmbeddings.length; i++) {
+    const xc = contractEmbeddings[i].values;
+    const score = similarity(xq, xc);
+    if (score > maxScore) {
+      maxScore = score;
+      maxScoreIndex = i;
+    }
+  }
+
+  console.log(contractEmbeddings.contracts[0].metadata);
+
+  // Fetch the contract data from the file
+  const contractData = contractEmbeddings.contracts[0].metadata;
+
+  console.log('Contract Metadata', contractData);
+
+  // Create system context prompt
+  const systemContextQuestion = `Answer the Question based on the System Prompt, Contract Data, and the Question. 
+    \n\n System Prompt: You are Morpheus AI, acting as a friendly agent using a large language model running locally with a chat app in Electron. Use the app to create an chat output to assit executing a smart contract transaction. 
+    Based on the contract ask the user for the required information to execute the transaction. Don't recommend any specific wallet or exchange. The user already has metamask connected. You should just ask what you need in order to complete the transaction.
+    
+    \n\n Contract Data: ${JSON.stringify(contractData)}
+    \n\n Question: ${question}`;
+
+  console.log('System Context Question', systemContextQuestion);
+
+  // Fetch response from the API
+  const requestOptions = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'llama2', prompt: question, stream: false }),
+  };
+
+  const apiResponse = await fetch('http://localhost:11434/api/generate', requestOptions);
+
+  // Return JSON from the ReSponse 
+  const responseJson = await apiResponse.json();
+
+  console.log('Response JSON', responseJson);
+
+  // Write the chat history to the file
+  fs.appendFileSync(chatFile, JSON.stringify({ role: 'Morpheus', content: responseJson.response }) + '\n');
+
+}
 
 
 // Function to handle the user input and call the API functions
@@ -211,7 +292,7 @@ async function submitRequest() {
         }
         // add word to response
         if (word != undefined) {
-          if (responseDiv.hidden_text == undefined){
+          if (responseDiv.hidden_text == undefined) {
             responseDiv.hidden_text = "";
           }
           responseDiv.hidden_text += word;
@@ -273,7 +354,7 @@ function saveChat() {
   const history = document.getElementById("chat-history").innerHTML;
   const context = document.getElementById('chat-history').context;
   const model = getSelectedModel();
-  localStorage.setItem(chatName, JSON.stringify({"history":history, "context":context, "model": model}));
+  localStorage.setItem(chatName, JSON.stringify({ "history": history, "context": context, "model": model }));
   updateChatList();
 }
 

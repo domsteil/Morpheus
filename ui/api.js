@@ -68,6 +68,19 @@ function postRequest(data, signal) {
   });
 }
 
+
+// Function to send a POST request to the API for embeddings
+function postEmbeddingRequest(data, signal) {
+  return fetch(`http://${ollama_host}:11434/api/embeddings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data),
+    signal: signal
+  });
+}
+
 // Function to stream the response from the server
 async function getResponse(response, callback) {
   const reader = response.body.getReader();
