@@ -179,7 +179,6 @@ async function submitAsyncRAGRequest() {
   const contractEmbeddings = JSON.parse(fs.readFileSync(file, 'utf8'));
 
   // For each item in contract embeddings find the one with the highest similarity score
-  // LB
   let maxScore = 0;
   let maxScoreIndex = 0;
 
@@ -197,8 +196,6 @@ async function submitAsyncRAGRequest() {
   // Fetch the contract data from the file
   const contractData = contractEmbeddings.contracts[0].metadata;
 
-  console.log('Contract Metadata', contractData);
-
   // Create system context prompt
   const systemContextQuestion = `Answer the Question based on the System Prompt, Contract Data, and the Question. 
     \n\n System Prompt: You are Morpheus AI, acting as a friendly agent using a large language model running locally with a chat app in Electron. Use the app to create an chat output to assit executing a smart contract transaction. 
@@ -206,8 +203,6 @@ async function submitAsyncRAGRequest() {
     
     \n\n Contract Data: ${JSON.stringify(contractData)}
     \n\n Question: ${question}`;
-
-  console.log('System Context Question', systemContextQuestion);
 
   // Fetch response from the API
   const requestOptions = {
