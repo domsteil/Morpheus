@@ -23,6 +23,7 @@
             <div class="col-md-8 col-12">
                 <img src="mtn.png" alt="MTN" style="width: 190px; height: 190px;">
                 <h1>Morpheus</h1>
+                <textarea class="form-control" id="system-prompt-input" placeholder="Type your System Prompt"></textarea>
             </div>
             <div id="model-controls" class="col-md-4 col-12 text-md-end text-start mb-3">
                 <div class="d-flex flex-column align-items-md-end align-items-start">
@@ -109,12 +110,8 @@
         else if (event.key === "Enter") {
             event.preventDefault(); // prevent the default behavior of the "Enter" key
             submitRequest(); // submit the form
-        } else if (event.key === "Enter" && userInput.value.contains("/test")) {
-            event.preventDefault(); // prevent the default behavior of the "Enter" key
-            submitRagRequest();
         }
     });
-
 </script>
 
   <script src="api.js"></script>

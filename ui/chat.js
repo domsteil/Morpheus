@@ -147,91 +147,69 @@ document.addEventListener("scroll", (event) => {
   lastKnownScrollPosition = window.scrollY;
 });
 
-async function submitAsyncRAGRequest() {
-
-  const input = document.getElementById('user-input').value;
-  const selectedModel = getSelectedModel();
-  const context = document.getElementById('chat-history').context;
-  const data = { model: selectedModel, prompt: input, context: context };
-
-  const chatFile = path.resolve('morpheus-electron/morpheus/renderer/public/channelthreads/chat.jsonl');
-
-  const chatHistory = JSON.parse(fs.readFileSync(chatFile, 'utf8'));
-
-  console.log('Chat History', chatHistory);
-
-  // Write the chat history to the file
-  fs.appendFileSync(chatFile, JSON.stringify({ role: "domsteil", content: question }) + '\n');
-
-  // Fetch embeddings from the API
-  const embeddingsRequestOptions = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'llama2', prompt: question }),
-  };
-
-  const embeddingResponse = await fetch('http://localhost:11434/api/embeddings', embeddingsRequestOptions);
-  const embeddingJson = await embeddingResponse.json();
-  const xq = embeddingJson.embedding;
-
-  // Read contract embeddings from the file
-  const file = path.resolve('morpheus-electron/morpheus/renderer/public/embeddings/uniswap.json');
-  const contractEmbeddings = JSON.parse(fs.readFileSync(file, 'utf8'));
-
-  // For each item in contract embeddings find the one with the highest similarity score
-  let maxScore = 0;
-  let maxScoreIndex = 0;
-
-  for (let i = 0; i < contractEmbeddings.length; i++) {
-    const xc = contractEmbeddings[i].values;
-    const score = similarity(xq, xc);
-    if (score > maxScore) {
-      maxScore = score;
-      maxScoreIndex = i;
-    }
-  }
-
-  console.log(contractEmbeddings.contracts[0].metadata);
-
-  // Fetch the contract data from the file
-  const contractData = contractEmbeddings.contracts[0].metadata;
-
-  // Create system context prompt
-  const systemContextQuestion = `Answer the Question based on the System Prompt, Contract Data, and the Question. 
-    \n\n System Prompt: You are Morpheus AI, acting as a friendly agent using a large language model running locally with a chat app in Electron. Use the app to create an chat output to assit executing a smart contract transaction. 
-    Based on the contract ask the user for the required information to execute the transaction. Don't recommend any specific wallet or exchange. The user already has metamask connected. You should just ask what you need in order to complete the transaction.
-    
-    \n\n Contract Data: ${JSON.stringify(contractData)}
-    \n\n Question: ${question}`;
-
-  // Fetch response from the API
-  const requestOptions = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'llama2', prompt: question, stream: false }),
-  };
-
-  const apiResponse = await fetch('http://localhost:11434/api/generate', requestOptions);
-
-  // Return JSON from the ReSponse 
-  const responseJson = await apiResponse.json();
-
-  console.log('Response JSON', responseJson);
-
-  // Write the chat history to the file
-  fs.appendFileSync(chatFile, JSON.stringify({ role: 'Morpheus', content: responseJson.response }) + '\n');
-
-}
-
-
 // Function to handle the user input and call the API functions
 async function submitRequest() {
+
   document.getElementById('chat-container').style.display = 'block';
 
+  // Example ABI from Uniswap
+  const abi = [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "tokenIn",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "tokenOut",
+              "type": "address"
+            },
+            {
+              "internalType": "uint24",
+              "name": "fee",
+              "type": "uint24"
+            },
+            {
+              "internalType": "address",
+              "name": "recipient",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "deadline",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amountIn",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amountOutMinimum",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint160",
+              "name": "sqrtPriceLimitX96",
+              "type": "uint160"
+            }
+          ],
+          "internalType": "struct ISwapRouter.ExactInputSingleParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ];
+
+  const system_prompt = 'Assist the user by asking questions to help them with the transactions. Answer the question for the user based on the contract ABI: ' + abi;
   const input = document.getElementById('user-input').value;
+  const system_prompt_input = document.getElementById('system-prompt-input').value;
+
   const selectedModel = getSelectedModel();
   const context = document.getElementById('chat-history').context;
-  const data = { model: selectedModel, prompt: input, context: context };
+  const data = { model: selectedModel, prompt: system_prompt_input + ' ' + input, context: context };
 
   // Create user message element and append to chat history
   let chatHistory = document.getElementById('chat-history');
@@ -266,6 +244,15 @@ async function submitRequest() {
   // change autoScroller to keep track of our new responseDiv
   autoScroller.observe(responseDiv);
 
+  var xq = [];
+
+  postEmbeddingRequest(input)
+    .then(async response => {
+      const embeddingJson = await response.json();
+      xq = embeddingJson.embedding;
+      console.log('Embeddings:', xq);
+    });
+    
   postRequest(data, interrupt.signal)
     .then(async response => {
       await getResponse(response, parsedResponse => {

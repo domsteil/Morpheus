@@ -55,9 +55,11 @@ async function getModels(){
   return data;
 }
 
-
 // Function to send a POST request to the API
 function postRequest(data, signal) {
+
+  console.log('Sending Data', data);
+
   return fetch(URL, {
     method: 'POST',
     headers: {
@@ -66,18 +68,21 @@ function postRequest(data, signal) {
     body: JSON.stringify(data),
     signal: signal
   });
+  
 }
 
-
 // Function to send a POST request to the API for embeddings
-function postEmbeddingRequest(data, signal) {
+function postEmbeddingRequest(data) {
+
   return fetch(`http://${ollama_host}:11434/api/embeddings`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(data),
-    signal: signal
+    body: JSON.stringify({
+      model: "llama2:latest",
+      prompt: data
+    })
   });
 }
 
