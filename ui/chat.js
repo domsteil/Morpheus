@@ -147,65 +147,130 @@ document.addEventListener("scroll", (event) => {
   lastKnownScrollPosition = window.scrollY;
 });
 
-// Function to handle the user input and call the API functions
+/* 
+1. Based on the User Request match the embedding from the request to the embeddings from the contracts
+2. Based on the embedding from the request, find the contract ABI that is closest to the request
+3. Based on the contract ABI, find the function that is closest to the request
+4. Based on the function, detect the parameters from the users request
+5. Based on the input parameters, generate the transaction
+6. Based on the transaction, generate the raw transaction to be signed
+7. Based on the raw transaction, generate and send the signed raw transaction (eth_sendRawTransaction) using the private key
+*/
+
 async function submitRequest() {
 
   document.getElementById('chat-container').style.display = 'block';
 
-  // Example ABI from Uniswap
-  const abi = [
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "tokenIn",
-              "type": "address"
-            },
-            {
-              "internalType": "address",
-              "name": "tokenOut",
-              "type": "address"
-            },
-            {
-              "internalType": "uint24",
-              "name": "fee",
-              "type": "uint24"
-            },
-            {
-              "internalType": "address",
-              "name": "recipient",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "deadline",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "amountIn",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "amountOutMinimum",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint160",
-              "name": "sqrtPriceLimitX96",
-              "type": "uint160"
-            }
-          ],
-          "internalType": "struct ISwapRouter.ExactInputSingleParams",
-          "name": "params",
-          "type": "tuple"
-        }
-      ];
+  /*   // Example ABI from Uniswap
+    const abi = [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "tokenIn",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "tokenOut",
+                "type": "address"
+              },
+              {
+                "internalType": "uint24",
+                "name": "fee",
+                "type": "uint24"
+              },
+              {
+                "internalType": "address",
+                "name": "recipient",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "deadline",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amountIn",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amountOutMinimum",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint160",
+                "name": "sqrtPriceLimitX96",
+                "type": "uint160"
+              }
+            ],
+            "internalType": "struct ISwapRouter.ExactInputSingleParams",
+            "name": "params",
+            "type": "tuple"
+          }
+        ]; */
 
-  const system_prompt = 'Assist the user by asking questions to help them with the transactions. Answer the question for the user based on the contract ABI: ' + abi;
+
+  const example_send_erc20_abi = {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "transfer",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  };
+
+
+  /*   var send_erc20_function = [
+      {
+        "name": "send_erc20",
+        "description": "Send ERC20 token to an address",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "description": "The address to send the token to"
+            },
+            "amount": {
+              "type": "string",
+              "description": "The amount of the token to send"
+            },
+            "token_address": {
+              "type": "string",
+              "description": "The address of the token to send"
+            }
+          },
+          "required": ["address", "amount", "token_address"]
+        }
+      }
+    ]; */
+
+  const system_prompt = 'Assist the user by asking questions to help them with the transaction output. Answer the question for the user based on the contract ABI: ' + example_send_erc20_abi + ". Once you have all of the data you need.";
+
+  // Testing the transaction build
+  // const system_prompt_test = 'You are a transaction builder for the Morpheus application. Your response should only be the signed transaction in hex format. You can automatically detect the input parameters for the smart contract 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48. Generate a signed transaction based on the input from the user, the ABI ' + example_send_erc20_abi + " and the private key " + private_key;
+
   const input = document.getElementById('user-input').value;
-  const system_prompt_input = document.getElementById('system-prompt-input').value;
+  const system_prompt_input = document.getElementById('system-prompt-input').value ? document.getElementById('system-prompt-input').value : system_prompt_test;
 
   const selectedModel = getSelectedModel();
   const context = document.getElementById('chat-history').context;
@@ -246,13 +311,62 @@ async function submitRequest() {
 
   var xq = [];
 
+  // Get Embedding from the request
+
   postEmbeddingRequest(input)
     .then(async response => {
       const embeddingJson = await response.json();
       xq = embeddingJson.embedding;
       console.log('Embeddings:', xq);
     });
-    
+
+
+  // Compare the Embedding from the request to the Embeddings from the contracts
+  // Sort and Rank the Embeddings from the contracts based on the distance from the Embedding from the request
+  // Find the contract ABI that is closest to the request
+
+  // Need to solve for fetching metadata from the filepath
+
+  // Read contract embeddings from the file
+  const file = path.resolve('morpheus-electron/morpheus/renderer/public/embeddings/uniswap.json');
+  const contractEmbeddings = JSON.parse(fs.readFileSync(file, 'utf8'));
+
+  // For each item in contract embeddings find the one with the highest similarity score
+  // LB
+  let maxScore = 0;
+  let maxScoreIndex = 0;
+
+
+  // Need to solve for the similariy rankings function 
+
+
+  for (let i = 0; i < contractEmbeddings.length; i++) {
+    const xc = contractEmbeddings[i].values;
+    const score = similarity(xq, xc);
+    if (score > maxScore) {
+      maxScore = score;
+      maxScoreIndex = i;
+    }
+  }
+
+  // Need to solve for imporating ethers
+
+  const private_key = '';
+
+  const sender_wallet = new ethers.Wallet(private_key, provider);
+
+  const USDC_CONTRACT_FROM_SMART_RANK = '';
+  const ABI_FROM_SMART_RANK = example_send_erc20_abi;
+  const DYNAMIC_FUNCTION_NAME_FROM_SMART_RANK = '';
+  const DYNAMIC_FUNCTION_PARAMETERS_FROM_SMART_RANK = ['', ''];
+
+  
+  // Get the contract
+  const contract = new ethers.Contract(USDC_CONTRACT_FROM_SMART_RANK, ABI_FROM_SMART_RANK, sender_wallet);
+
+  // Call the transaction 
+  const transaction = await contract.DYNAMIC_FUNCTION_NAME_FROM_SMART_RANK(DYNAMIC_FUNCTION_PARAMETERS_FROM_SMART_RANK);
+
   postRequest(data, interrupt.signal)
     .then(async response => {
       await getResponse(response, parsedResponse => {
